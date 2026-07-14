@@ -68,6 +68,8 @@
   .bar i{display:block; height:100%; background:var(--accent)}
   .pct{font-variant-numeric:tabular-nums}
   .pct.full{color:var(--green); font-weight:700}
+  /* 카드 검색으로 걸린 작품에는 진도 막대 대신 「카드 N」 배지를 보여준다 */
+  .hit{flex:1; text-align:center; color:var(--accent); font-weight:700; font-variant-numeric:tabular-nums}
 
   /* 카드 그리드 */
   .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:16px}
@@ -138,8 +140,15 @@
       <button class="back" id="backBtn" hidden>← 작품 목록</button>
       <label class="search">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input id="q" type="search" placeholder="작품 검색…" autocomplete="off">
+        <input id="q" type="search" placeholder="작품·카드 검색…" autocomplete="off">
       </label>
+      <span id="homeCtls" style="display:contents">
+        <select class="ctl" id="sortSel">
+          <option value="groups">카드 종수 많은 순</option>
+          <option value="newest">최신 발매순</option>
+          <option value="ws">바이스 · 슈발츠 순</option>
+        </select>
+      </span>
       <span id="cardCtls" hidden style="display:contents">
         <div class="chips" id="colorChips"></div>
         <select class="ctl" id="kindSel"><option value="">종류 전체</option></select>
@@ -186,11 +195,11 @@
   function shardOf(p){ let h=0x811c9dc5; for(let i=0;i<p.length;i++){ h^=p.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h%SHARDS; }
   const imgUrl=(key,size)=> 'https://cdn.jsdelivr.net/gh/'+GH+'/'+PREFIX+shardOf(key)+'@main/'+size+'/'+key;
 
-  // 빌드 스탬프. build2.js가 1784000427531를 매 빌드마다 교체한다.
+  // 빌드 스탬프. build2.js가 1784001964689를 매 빌드마다 교체한다.
   // ⚠️ 이게 없으면 브라우저가 data/t/<작품>.json을 캐시해 **번역이 갱신돼도 옛 일본어판을 계속 보여준다**.
   //    build2는 미번역 작품도 t/<key>.json을 만들므로, 번역 전에 한 번이라도 열어본 작품은
   //    캐시에 "한국어 없는 판"이 남는다. 걸프렌드(24)가 실제로 그랬다.
-  const BUILD='1784000427531';
+  const BUILD='1784001964689';
   let M=null, G=null, TITLE=null, showJP=false;
   let filtered=[], drawn=0;
   const CHUNK=40;
@@ -214,24 +223,58 @@
   const icons = str => (!str||str==="-") ? '<span style="color:var(--muted)">-</span>'
     : String(str).replace(/\[\[([^\]]+)\]\]/g,(m,f)=>iconHtml(f));
 
+  // ── 홈: 정렬 ──
+  // 「최신 발매순」의 t.newest는 catalog.expansions의 순번(= 발매 순서) 최댓값이다. build2가 넣는다.
+  // 「바이스·슈발츠」의 t.ws는 카드번호 프리픽스 첫 글자(W/S)의 작품별 다수결이다.
+  const SORTS={
+    groups:(a,b)=> b.groups-a.groups || a.ko.localeCompare(b.ko,'ko'),
+    newest:(a,b)=> b.newest-a.newest || b.groups-a.groups,
+    ws:    (a,b)=> (a.ws===b.ws) ? (b.groups-a.groups) : (a.ws==='W'?-1:1),
+  };
+
+  // ── 홈: 카드 검색 ──
+  // search.json은 [카드번호, 한글명, 일본어명, 작품키] 41,667건(3.3MB)이라 **처음 검색할 때만** 받는다.
+  // 홈 진입만 하고 검색을 안 하는 사용자에게 3.3MB를 물리지 않는다.
+  let SEARCH=null, searchLoading=null;
+  function loadSearch(){
+    if(SEARCH) return Promise.resolve(SEARCH);
+    if(!searchLoading) searchLoading=fetch('data/search.json?v='+BUILD).then(r=>r.json()).then(j=>(SEARCH=j));
+    return searchLoading;
+  }
+  function cardHits(q){                        // 작품키 → 매칭 카드 수
+    if(!SEARCH||!q) return null;
+    const hit={};
+    for(const [no,ko,jp,key] of SEARCH){
+      if(no.toLowerCase().includes(q) || ko.toLowerCase().includes(q) || jp.toLowerCase().includes(q))
+        hit[key]=(hit[key]||0)+1;
+    }
+    return hit;
+  }
+
   // ── 홈: 작품 목록 ──
   function renderTitles(){
     const q=$('#q').value.trim().toLowerCase();
     const box=$('#titles'); box.innerHTML='';
-    const list=M.titles.filter(t=>!q || (t.ko+' '+t.jp).toLowerCase().includes(q));
+    const hits=cardHits(q);
+    const nameHit=t=>(t.ko+' '+t.jp).toLowerCase().includes(q);
+    const list=M.titles
+      .filter(t=>!q || nameHit(t) || (hits&&hits[t.key]))
+      .sort(SORTS[$('#sortSel').value]||SORTS.groups);
     list.forEach(t=>{
       const pct=t.groups? Math.round(t.translated/t.groups*100):0;
+      const n=hits&&hits[t.key];
       const el=document.createElement('button'); el.className='tcard';
       el.innerHTML='<div class="tname">'+esc(t.ko)+'</div>'+
         (t.ko!==t.jp?'<div class="tjp">'+esc(t.jp)+'</div>':'<div class="tjp">&nbsp;</div>')+
         '<div class="tmeta"><span>'+t.groups+'종</span>'+
-        '<span class="bar"><i style="width:'+pct+'%"></i></span>'+
+        (n?'<span class="hit">카드 '+n+'</span>':'<span class="bar"><i style="width:'+pct+'%"></i></span>')+
         '<span class="pct'+(pct===100?' full':'')+'">'+pct+'%</span></div>';
-      el.onclick=()=>openTitle(t.key);
+      el.onclick=()=>{ location.hash='#'+t.key; };   // 라우터가 연다 (뒤로가기가 동작하도록)
       box.appendChild(el);
     });
     $('#empty').hidden=list.length>0;
-    $('#empty').textContent='해당하는 작품이 없습니다.';
+    $('#empty').textContent = q && !SEARCH ? '작품 이름에 맞는 결과가 없습니다. 카드 검색을 불러오는 중…'
+                                           : '해당하는 작품이 없습니다.';
   }
 
   // ── 작품 열기 ──
@@ -240,14 +283,13 @@
     const r=await fetch('data/t/'+key+'.json?v='+BUILD);
     TITLE=await r.json();
     $('#loading').hidden=true;
-    location.hash='#'+key;
 
     $('#hTitle').textContent=TITLE.ko;
     $('#hSub').textContent=(TITLE.ko!==TITLE.jp?TITLE.jp:'');
     const tr=TITLE.groups.filter(g=>g.nk).length;
     $('#hStats').innerHTML='<span>기본카드 <b>'+TITLE.groups.length+'</b></span>'+
       '<span>번역 <b>'+tr+'</b>/'+TITLE.groups.length+'</span>';
-    $('#backBtn').hidden=false; $('#cardCtls').hidden=false;
+    $('#backBtn').hidden=false; $('#cardCtls').hidden=false; $('#homeCtls').hidden=true;
     $('#q').value=''; $('#q').placeholder='이름 · 카드번호 · 효과 검색…';
 
     // 필터 옵션 채우기
@@ -266,14 +308,28 @@
     apply();
   }
   function goHome(){
-    TITLE=null; location.hash='';
+    TITLE=null;
     $('#grid').innerHTML=''; $('#titles').hidden=false;
-    $('#backBtn').hidden=true; $('#cardCtls').hidden=true;
+    $('#backBtn').hidden=true; $('#cardCtls').hidden=true; $('#homeCtls').hidden=false;
     $('#hTitle').textContent='바이스슈발츠 카드리스트';
     $('#hSub').textContent='레어도별 그룹 + 한글화';
-    $('#q').value=''; $('#q').placeholder='작품 검색…';
+    $('#q').value=''; $('#q').placeholder='작품·카드 검색…';
     setStats(); renderTitles();
   }
+
+  // ── 라우터 ────────────────────────────────────────────────
+  // **해시가 유일한 진실원이다.** 화면 전환은 전부 `location.hash`를 바꿔서 하고, 실제 렌더는
+  // 여기서만 한다. 그래야 **브라우저 뒤로가기**가 동작한다 — 예전엔 openTitle이 해시를 쓰기만
+  // 하고 hashchange를 듣지 않아, 뒤로가기를 눌러도 주소만 바뀌고 화면은 그대로였다.
+  function route(){
+    const h=location.hash.replace(/^#/,'');
+    if(h && M.titles.some(t=>t.key===h)){
+      if(!TITLE || TITLE.key!==h) openTitle(h);
+    } else if(TITLE) {
+      goHome();
+    }
+  }
+  window.addEventListener('hashchange', route);
   function setStats(){
     $('#hStats').innerHTML='<span>작품 <b>'+M.meta.titleCount+'</b></span>'+
       '<span>기본카드 <b>'+M.meta.totalGroups.toLocaleString()+'</b></span>'+
@@ -373,11 +429,18 @@
   });
 
   // ── 이벤트 ──
-  $('#q').addEventListener('input', ()=> TITLE?apply():renderTitles());
+  $('#q').addEventListener('input', ()=>{
+    if(TITLE) return apply();
+    renderTitles();
+    // 홈에서 검색어를 치면 그때 카드 색인을 받아 온다. 다 받으면 한 번 더 그린다.
+    const q=$('#q').value.trim();
+    if(q && !SEARCH) loadSearch().then(()=>{ if(!TITLE) renderTitles(); });
+  });
+  $('#sortSel').addEventListener('change', ()=>{ if(!TITLE) renderTitles(); });
   ['#kindSel','#levelSel','#expSel','#untrChk'].forEach(s=>$(s).addEventListener('change',apply));
   $('#jpChk').addEventListener('change',e=>{ showJP=e.target.checked; apply(); });
-  $('#backBtn').onclick=goHome;
-  $('#hTitle').onclick=()=>{ if(TITLE) goHome(); };
+  $('#backBtn').onclick=()=>{ location.hash=''; };   // 라우터가 홈으로 돌린다
+  $('#hTitle').onclick=()=>{ if(TITLE) location.hash=''; };
   const themeBtn=$('#themeBtn');
   const saved=localStorage.getItem('ws_theme'); if(saved) document.documentElement.dataset.theme=saved;
   themeBtn.onclick=()=>{
@@ -392,7 +455,7 @@
     M=await (await fetch('data/manifest.json?v='+BUILD)).json();
     G=M.glossary; SHARDS=M.cdn||16;
     setStats();
-    const h=location.hash.replace('#','');
+    const h=location.hash.replace(/^#/,'');
     if(h && M.titles.some(t=>t.key===h)) openTitle(h); else renderTitles();
   })();
 })();
