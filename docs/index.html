@@ -209,11 +209,11 @@
   function shardOf(p){ let h=0x811c9dc5; for(let i=0;i<p.length;i++){ h^=p.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h%SHARDS; }
   const imgUrl=(key,size)=> 'https://cdn.jsdelivr.net/gh/'+GH+'/'+PREFIX+shardOf(key)+'@main/'+size+'/'+key;
 
-  // 빌드 스탬프. build2.js가 1784247981490를 매 빌드마다 교체한다.
+  // 빌드 스탬프. build2.js가 1784248131779를 매 빌드마다 교체한다.
   // ⚠️ 이게 없으면 브라우저가 data/t/<작품>.json을 캐시해 **번역이 갱신돼도 옛 일본어판을 계속 보여준다**.
   //    build2는 미번역 작품도 t/<key>.json을 만들므로, 번역 전에 한 번이라도 열어본 작품은
   //    캐시에 "한국어 없는 판"이 남는다. 걸프렌드(24)가 실제로 그랬다.
-  const BUILD='1784247981490';
+  const BUILD='1784248131779';
   let M=null, G=null, TITLE=null, showJP=false;
   let filtered=[], drawn=0;
   const CHUNK=40;
@@ -243,11 +243,16 @@
   // 진영은 바이스 → 슈발츠 → (진영 없는 「기타 프로모」) 순. renderTitles가 구획 머리글을 끼운다.
   const WSR=t=> t.ws==='W'?0 : t.ws==='S'?1 : 2;
   const SECT={W:['바이스 사이드','W'], S:['슈발츠 사이드','S'], '':['기타','X']};
+  // 「기타 프로모」(build2의 MISC 버킷)는 작품이 아니라 어느 작품에도 안 붙는 부시로드 공용
+  // 프로모를 모아 둔 잡동사니다. 종수·발매순으로 줄 세우면 작품들 사이에 끼어드니 **어느 정렬에서든
+  // 맨 아래에 고정한다.** 정렬 함수마다 넣으면 새 정렬을 더할 때 빠뜨리므로 여기서 한 번에 씌운다.
+  const pin=cmp=> (a,b)=> (a.key==='etc') - (b.key==='etc') || cmp(a,b);
   const SORTS={
     groups:(a,b)=> b.groups-a.groups || a.ko.localeCompare(b.ko,'ko'),
     newest:(a,b)=> b.newest-a.newest || b.groups-a.groups,
     ws:    (a,b)=> WSR(a)-WSR(b) || b.groups-a.groups,
   };
+  for(const k in SORTS) SORTS[k]=pin(SORTS[k]);
 
   // ── 홈: 카드 검색 ──
   // search.json은 [카드번호, 한글명, 일본어명, 작품키] 41,667건(3.3MB)이라 **처음 검색할 때만** 받는다.
