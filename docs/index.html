@@ -158,8 +158,8 @@
       </label>
       <span id="homeCtls" style="display:contents">
         <select class="ctl" id="sortSel">
-          <option value="groups">카드 종수 많은 순</option>
           <option value="newest">최신 발매순</option>
+          <option value="groups">카드 종수 많은 순</option>
           <option value="ws">바이스 · 슈발츠 사이드별</option>
         </select>
       </span>
@@ -209,11 +209,11 @@
   function shardOf(p){ let h=0x811c9dc5; for(let i=0;i<p.length;i++){ h^=p.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h%SHARDS; }
   const imgUrl=(key,size)=> 'https://cdn.jsdelivr.net/gh/'+GH+'/'+PREFIX+shardOf(key)+'@main/'+size+'/'+key;
 
-  // 빌드 스탬프. build2.js가 1784040351398를 매 빌드마다 교체한다.
+  // 빌드 스탬프. build2.js가 1784247981490를 매 빌드마다 교체한다.
   // ⚠️ 이게 없으면 브라우저가 data/t/<작품>.json을 캐시해 **번역이 갱신돼도 옛 일본어판을 계속 보여준다**.
   //    build2는 미번역 작품도 t/<key>.json을 만들므로, 번역 전에 한 번이라도 열어본 작품은
   //    캐시에 "한국어 없는 판"이 남는다. 걸프렌드(24)가 실제로 그랬다.
-  const BUILD='1784040351398';
+  const BUILD='1784247981490';
   let M=null, G=null, TITLE=null, showJP=false;
   let filtered=[], drawn=0;
   const CHUNK=40;
@@ -277,7 +277,7 @@
     const mode=$('#sortSel').value;
     const list=M.titles
       .filter(t=>!q || nameHit(t) || (hits&&hits[t.key]))
-      .sort(SORTS[mode]||SORTS.groups);
+      .sort(SORTS[mode]||SORTS.newest);
 
     // 진영 정렬일 땐 구획으로 나눠 보여준다 — 순서만 바꿔서는 경계가 안 보인다.
     const secCnt={};
