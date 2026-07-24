@@ -177,7 +177,7 @@
         <select class="ctl" id="levelSel"><option value="">레벨 전체</option></select>
         <select class="ctl" id="expSel"><option value="">수록 전체</option></select>
         <label class="chip"><input type="checkbox" id="untrChk" style="margin:0 2px 0 0"> 미번역만</label>
-        <label class="chip"><input type="checkbox" id="jpChk" style="margin:0 2px 0 0"> 일본어 병기</label>
+        <select class="ctl" id="langSel" title="표시 언어"><option value="ko">한국어</option><option value="ja">日本語</option></select>
       </span>
       <button class="chip" id="themeBtn" title="테마 전환">🌓</button>
     </div>
@@ -217,12 +217,12 @@
   function shardOf(p){ let h=0x811c9dc5; for(let i=0;i<p.length;i++){ h^=p.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h%SHARDS; }
   const imgUrl=(key,size)=> 'https://cdn.jsdelivr.net/gh/'+GH+'/'+PREFIX+shardOf(key)+'@main/'+size+'/'+key;
 
-  // 빌드 스탬프. build2.js가 1784867971918를 매 빌드마다 교체한다.
+  // 빌드 스탬프. build2.js가 1784868449064를 매 빌드마다 교체한다.
   // ⚠️ 이게 없으면 브라우저가 data/t/<작품>.json을 캐시해 **번역이 갱신돼도 옛 일본어판을 계속 보여준다**.
   //    build2는 미번역 작품도 t/<key>.json을 만들므로, 번역 전에 한 번이라도 열어본 작품은
   //    캐시에 "한국어 없는 판"이 남는다. 걸프렌드(24)가 실제로 그랬다.
-  const BUILD='1784867971918';
-  let M=null, G=null, TITLE=null, showJP=false;
+  const BUILD='1784868449064';
+  let M=null, G=null, TITLE=null, lang=localStorage.getItem('ws_lang')||'ko';
   let filtered=[], drawn=0;
   const CHUNK=40;
 
@@ -385,9 +385,10 @@
   function cardEl(g){
     const el=document.createElement('article'); el.className='card';
     const rep=g.v.find(v=>v.b)||g.v[0];
-    const name=g.nk||g.nj;
-    const untr=g.nk?'':'<span class="untr">미번역</span>';
-    const feats=(g.fk&&g.fk.length?g.fk:g.fj).map(f=>'<span class="feat">'+esc(f)+'</span>').join('');
+    const ja=lang==='ja';                              // 표시 언어(한/일). 일본어면 원문, 아니면 한글(없으면 원문 폴백)
+    const name=ja?g.nj:(g.nk||g.nj);
+    const untr=(ja||g.nk)?'':'<span class="untr">미번역</span>';   // 「미번역」은 한글 기준 상태 → 일본어 보기에선 숨긴다
+    const feats=(ja?g.fj:(g.fk&&g.fk.length?g.fk:g.fj)).map(f=>'<span class="feat">'+esc(f)+'</span>').join('');
     const p=[];
     if(g.c) p.push('<span class="kv">'+iconHtml(g.c)+esc((G.icons[g.c]||{}).ko||'')+'</span>');
     p.push('<span class="kind-tag">'+esc(g.k)+'</span>');
@@ -401,12 +402,10 @@
     el.innerHTML='<div class="card-top">'+
       '<div class="thumb"><img'+(rep.l?' class="land"':'')+' loading="lazy" src="'+imgUrl(rep.i,'t')+'" alt="'+esc(name)+'"></div>'+
       '<div class="info"><div class="name">'+esc(name)+untr+
-        (showJP?'<span class="jp">'+esc(g.nj)+'</span>':'')+
         '<div class="base-no">'+esc(g.b)+' · '+g.v.length+'종</div></div>'+
         '<div class="statline">'+p.join('')+'</div>'+
         (feats?'<div class="features">'+feats+'</div>':'')+
-        '<div class="text">'+renderText(g.tk||g.tj)+'</div>'+
-        (showJP?'<div class="text jp"><b style="color:var(--muted)">日</b> '+renderText(g.tj)+'</div>':'')+
+        '<div class="text">'+renderText(ja?g.tj:(g.tk||g.tj))+'</div>'+
       '</div></div>'+
       '<div class="variants">'+g.v.map((v,i)=>
         '<button class="var'+(v.b?' base':'')+'" data-vi="'+i+'">'+
@@ -483,9 +482,10 @@
   });
   $('#sortSel').addEventListener('change', ()=>{ if(!TITLE) renderTitles(); });
   ['#kindSel','#levelSel','#expSel','#untrChk'].forEach(s=>$(s).addEventListener('change',apply));
-  $('#jpChk').addEventListener('change',e=>{ showJP=e.target.checked; apply(); });
+  $('#langSel').addEventListener('change',e=>{ lang=e.target.value; localStorage.setItem('ws_lang',lang); apply(); });
   $('#backBtn').onclick=()=>{ location.hash=''; };   // 라우터가 홈으로 돌린다
   $('#hTitle').onclick=()=>{ if(TITLE) location.hash=''; };
+  $('#langSel').value=lang;                            // 저장된 표시 언어 복원
   const themeBtn=$('#themeBtn');
   const saved=localStorage.getItem('ws_theme'); if(saved) document.documentElement.dataset.theme=saved;
   themeBtn.onclick=()=>{
