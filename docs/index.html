@@ -120,6 +120,9 @@
   .var{flex:none; width:66px; border:0; background:transparent; padding:0; cursor:zoom-in; text-align:center; position:relative;}
   .var img{width:100%; border-radius:5px; display:block; border:1px solid var(--border); background:var(--panel); aspect-ratio:460/643}
   .var.base img{outline:2px solid var(--accent)}
+  /* 클라이맥스는 가로형 카드다. 세로 비율(460/643)에 욱여넣으면 세로로 늘어나 보인다 —
+     원본과 같은 가로 비율(643/460 = 세로 카드를 90° 돌린 값)로 되돌린다. */
+  .card.cx .thumb img, .card.cx .var img{aspect-ratio:643/460}
   .badge{position:absolute; top:3px; left:3px; font-size:9px; font-weight:800;
     background:var(--badge); color:#fff; border-radius:4px; padding:1px 4px; line-height:1.3;}
   .badge.p{background:var(--accent)}
@@ -213,11 +216,11 @@
   function shardOf(p){ let h=0x811c9dc5; for(let i=0;i<p.length;i++){ h^=p.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h%SHARDS; }
   const imgUrl=(key,size)=> 'https://cdn.jsdelivr.net/gh/'+GH+'/'+PREFIX+shardOf(key)+'@main/'+size+'/'+key;
 
-  // 빌드 스탬프. build2.js가 1784643950496를 매 빌드마다 교체한다.
+  // 빌드 스탬프. build2.js가 1784866640518를 매 빌드마다 교체한다.
   // ⚠️ 이게 없으면 브라우저가 data/t/<작품>.json을 캐시해 **번역이 갱신돼도 옛 일본어판을 계속 보여준다**.
   //    build2는 미번역 작품도 t/<key>.json을 만들므로, 번역 전에 한 번이라도 열어본 작품은
   //    캐시에 "한국어 없는 판"이 남는다. 걸프렌드(24)가 실제로 그랬다.
-  const BUILD='1784643950496';
+  const BUILD='1784866640518';
   let M=null, G=null, TITLE=null, showJP=false;
   let filtered=[], drawn=0;
   const CHUNK=40;
@@ -379,7 +382,7 @@
 
   // ── 카드 렌더 (화면에 들어오는 만큼만) ──
   function cardEl(g){
-    const el=document.createElement('article'); el.className='card';
+    const el=document.createElement('article'); el.className='card'+(g.k==='클라이맥스'?' cx':'');
     const rep=g.v.find(v=>v.b)||g.v[0];
     const name=g.nk||g.nj;
     const untr=g.nk?'':'<span class="untr">미번역</span>';
