@@ -60,6 +60,16 @@
 
   main{max-width:1280px; margin:0 auto; padding:18px}
 
+  /* 브랜드 대분류 탭 (홈 최상단) — 바이스슈발츠 / 로제 / 블라우 */
+  .brandtabs{display:flex; gap:7px; margin:2px 0 15px; flex-wrap:wrap}
+  .brandtab{appearance:none; cursor:pointer; border:1px solid var(--border); background:var(--panel);
+    color:var(--muted); border-radius:999px; padding:8px 15px; font-size:13.5px; font-weight:700;
+    letter-spacing:-.2px; transition:.12s; display:inline-flex; align-items:baseline; gap:7px}
+  .brandtab:hover{border-color:var(--accent); color:var(--fg)}
+  .brandtab.on{background:var(--accent); border-color:var(--accent); color:#fff}
+  .brandtab .bn{font-size:11px; font-weight:600; opacity:.8; font-variant-numeric:tabular-nums}
+  .brandtab.on .bn{opacity:.85}
+
   /* 작품 고르기 (홈) */
   .titles{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:11px}
   .tcard{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:13px 14px;
@@ -187,6 +197,7 @@
 </header>
 
 <main>
+  <div class="brandtabs" id="brandTabs"></div>
   <div class="titles" id="titles"></div>
   <div class="grid" id="grid"></div>
   <div id="sentinel"></div>
@@ -219,11 +230,11 @@
   function shardOf(p){ let h=0x811c9dc5; for(let i=0;i<p.length;i++){ h^=p.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h%SHARDS; }
   const imgUrl=(key,size)=> 'https://cdn.jsdelivr.net/gh/'+GH+'/'+PREFIX+shardOf(key)+'@main/'+size+'/'+key;
 
-  // 빌드 스탬프. build2.js가 1790680605757를 매 빌드마다 교체한다.
+  // 빌드 스탬프. build2.js가 1790807154320를 매 빌드마다 교체한다.
   // ⚠️ 이게 없으면 브라우저가 data/t/<작품>.json을 캐시해 **번역이 갱신돼도 옛 일본어판을 계속 보여준다**.
   //    build2는 미번역 작품도 t/<key>.json을 만들므로, 번역 전에 한 번이라도 열어본 작품은
   //    캐시에 "한국어 없는 판"이 남는다. 걸프렌드(24)가 실제로 그랬다.
-  const BUILD='1790680605757';
+  const BUILD='1790807154320';
   let M=null, G=null, TITLE=null, lang=localStorage.getItem('ws_lang')||'ko';
   let filtered=[], drawn=0;
   const CHUNK=40;
@@ -288,6 +299,25 @@
     return hit;
   }
 
+  // ── 홈: 브랜드 대분류 (바이스슈발츠 / 로제 / 블라우) ──
+  // 게임의 3개 제품군을 첫 화면에서 나눈다. 기본은 '바이스슈발츠'(ws).
+  // 작품 데이터에 brand가 없으면 build2가 'ws'로 채우므로 기존 카탈로그는 전부 여기 들어온다.
+  const BRAND_DEFS=[['ws','바이스슈발츠'],['rose','바이스슈발츠 로제'],['blau','바이스슈발츠 블라우']];
+  let BRAND=localStorage.getItem('ws_brand')||'ws';
+  if(!BRAND_DEFS.some(b=>b[0]===BRAND)) BRAND='ws';
+  const brandOf=t=> t.brand||'ws';
+  function renderBrandTabs(){
+    const box=$('#brandTabs'); if(!box) return;
+    const cnt={}; M.titles.forEach(t=>{ const b=brandOf(t); cnt[b]=(cnt[b]||0)+1; });
+    box.innerHTML=BRAND_DEFS.map(([id,label])=>
+      '<button class="brandtab'+(id===BRAND?' on':'')+'" data-brand="'+id+'">'+
+        esc(label)+'<span class="bn">'+(cnt[id]||0)+'</span></button>').join('');
+    $$('.brandtab',box).forEach(b=>b.onclick=()=>{
+      BRAND=b.dataset.brand; localStorage.setItem('ws_brand',BRAND);
+      renderBrandTabs(); renderTitles();
+    });
+  }
+
   // ── 홈: 작품 목록 ──
   function renderTitles(){
     const q=$('#q').value.trim().toLowerCase();
@@ -296,6 +326,7 @@
     const nameHit=t=>(t.ko+' '+t.jp).toLowerCase().includes(q);
     const mode=$('#sortSel').value;
     const list=M.titles
+      .filter(t=>brandOf(t)===BRAND)
       .filter(t=>!q || nameHit(t) || (hits&&hits[t.key]))
       .sort(SORTS[mode]||SORTS.newest);
 
@@ -325,13 +356,15 @@
       box.appendChild(el);
     });
     $('#empty').hidden=list.length>0;
+    const bname=(BRAND_DEFS.find(b=>b[0]===BRAND)||[])[1]||'';
     $('#empty').textContent = q && !SEARCH ? '작품 이름에 맞는 결과가 없습니다. 카드 검색을 불러오는 중…'
-                                           : '해당하는 작품이 없습니다.';
+                            : q            ? '해당하는 작품이 없습니다.'
+                                           : '「'+bname+'」에 아직 등록된 작품이 없습니다.';
   }
 
   // ── 작품 열기 ──
   async function openTitle(key){
-    $('#loading').hidden=false; $('#titles').hidden=true; $('#empty').hidden=true;
+    $('#loading').hidden=false; $('#titles').hidden=true; $('#empty').hidden=true; $('#brandTabs').hidden=true;
     const r=await fetch('data/t/'+key+'.json?v='+BUILD);
     TITLE=await r.json();
     $('#loading').hidden=true;
@@ -361,12 +394,12 @@
   }
   function goHome(){
     TITLE=null;
-    $('#grid').innerHTML=''; $('#titles').hidden=false;
+    $('#grid').innerHTML=''; $('#titles').hidden=false; $('#brandTabs').hidden=false;
     $('#backBtn').hidden=true; $('#cardCtls').hidden=true; $('#homeCtls').hidden=false;
     $('#hTitle').textContent='바이스슈발츠 카드리스트';
     $('#hSub').textContent='레어도별 그룹 + 한글화';
     $('#q').value=''; $('#q').placeholder='작품·카드 검색…';
-    setStats(); renderTitles();
+    setStats(); renderBrandTabs(); renderTitles();
   }
 
   // ── 라우터 ────────────────────────────────────────────────
@@ -507,6 +540,7 @@
     M=await (await fetch('data/manifest.json?v='+BUILD)).json();
     G=M.glossary; SHARDS=M.cdn||16;
     setStats();
+    renderBrandTabs();
     const h=location.hash.replace(/^#/,'');
     if(h && M.titles.some(t=>t.key===h)) openTitle(h); else renderTitles();
   })();
