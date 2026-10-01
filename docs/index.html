@@ -96,6 +96,9 @@
   .sig.S{background:#18181b; color:#f4f4f5}
   /* Z = 중문판(부시로드 차이나). 일본판 W/S 어느 쪽도 아닌 자체 계열이라 색도 따로 준다. */
   .sig.Z{background:#c0392b; color:#fff; border-color:#c0392b}
+  /* 에디션 배지: J=일판 E=영문판 (중문판은 Z 재사용) */
+  .sig.J{background:#334155; color:#fff; border-color:#334155}
+  .sig.E{background:#2563eb; color:#fff; border-color:#2563eb}
   .sig.X{background:var(--panel2); color:var(--muted)}
 
   /* 카드 검색으로 걸린 작품에는 진도 막대 대신 「카드 N」 배지를 보여준다 */
@@ -230,11 +233,11 @@
   function shardOf(p){ let h=0x811c9dc5; for(let i=0;i<p.length;i++){ h^=p.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h%SHARDS; }
   const imgUrl=(key,size)=> 'https://cdn.jsdelivr.net/gh/'+GH+'/'+PREFIX+shardOf(key)+'@main/'+size+'/'+key;
 
-  // 빌드 스탬프. build2.js가 1790810879626를 매 빌드마다 교체한다.
+  // 빌드 스탬프. build2.js가 1790813055265를 매 빌드마다 교체한다.
   // ⚠️ 이게 없으면 브라우저가 data/t/<작품>.json을 캐시해 **번역이 갱신돼도 옛 일본어판을 계속 보여준다**.
   //    build2는 미번역 작품도 t/<key>.json을 만들므로, 번역 전에 한 번이라도 열어본 작품은
   //    캐시에 "한국어 없는 판"이 남는다. 걸프렌드(24)가 실제로 그랬다.
-  const BUILD='1790810879626';
+  const BUILD='1790813055265';
   let M=null, G=null, TITLE=null, lang=localStorage.getItem('ws_lang')||'ko';
   let filtered=[], drawn=0;
   const CHUNK=40;
@@ -325,18 +328,31 @@
     const hits=cardHits(q);
     const nameHit=t=>(t.ko+' '+t.jp).toLowerCase().includes(q);
     const mode=$('#sortSel').value;
-    const list=M.titles
+    // 바이스슈발츠 탭은 에디션(일판→영문판→중문판) 순으로 나눈다. 네오스탠다드상 서로 안 섞인다.
+    const EDN={jp:['일판','J'],en:['영문판','E'],cn:['중문판','Z']};
+    const edRank=t=> t.edition==='jp'?0 : t.edition==='en'?1 : t.edition==='cn'?2 : 3;
+    const useEd = BRAND==='ws' && !q;
+    let list=M.titles
       .filter(t=>brandOf(t)===BRAND)
       .filter(t=>!q || nameHit(t) || (hits&&hits[t.key]))
       .sort(SORTS[mode]||SORTS.newest);
+    if(useEd) list.sort((a,b)=> edRank(a)-edRank(b) || (SORTS[mode]||SORTS.newest)(a,b));
 
-    // 진영 정렬일 땐 구획으로 나눠 보여준다 — 순서만 바꿔서는 경계가 안 보인다.
+    // 구획: 에디션별(바이스슈발츠) 또는 진영별(ws 정렬 모드)
     const secCnt={};
-    if(mode==='ws') list.forEach(t=>{ secCnt[t.ws]=(secCnt[t.ws]||0)+1; });
+    if(useEd) list.forEach(t=>{ secCnt[t.edition]=(secCnt[t.edition]||0)+1; });
+    else if(mode==='ws') list.forEach(t=>{ secCnt[t.ws]=(secCnt[t.ws]||0)+1; });
     let sec;
 
     list.forEach(t=>{
-      if(mode==='ws' && t.ws!==sec){
+      if(useEd && t.edition!==sec){
+        sec=t.edition;
+        const [label,sig]=EDN[sec]||['일판','J'];
+        const h=document.createElement('div'); h.className='sechead';
+        h.innerHTML='<span class="sig '+sig+'">'+sig+'</span>'+esc(label)+
+          '<span class="n">'+secCnt[sec]+'작품</span>';
+        box.appendChild(h);
+      } else if(!useEd && mode==='ws' && t.ws!==sec){
         sec=t.ws;
         const [label,sig]=SECT[sec]||SECT[''];
         const h=document.createElement('div'); h.className='sechead';
