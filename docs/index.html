@@ -232,6 +232,16 @@
   let SHARDS=16;
   function shardOf(p){ let h=0x811c9dc5; for(let i=0;i<p.length;i++){ h^=p.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h%SHARDS; }
   const imgUrl=(key,size)=> 'https://cdn.jsdelivr.net/gh/'+GH+'/'+PREFIX+shardOf(key)+'@main/'+size+'/'+key;
+  // ⚠️ jsDelivr는 샤드 레포(~520MB)가 패키지 한도(50MB)를 넘어 새 파일 첫 요청에 403을 주고 60초 캐시한다.
+  //    실패한 이미지는 GitHub raw로 한 번만 다시 받는다(무한 루프 방지: data-fb). img error는 버블링 안 됨 → 캡처 단계.
+  document.addEventListener('error', e=>{
+    const img=e.target;
+    if(!(img instanceof HTMLImageElement) || img.dataset.fb) return;
+    const m=String(img.src).match(/^https:\/\/cdn\.jsdelivr\.net\/gh\/([^/]+)\/([^@/]+)@main\/(.+)$/);
+    if(!m) return;
+    img.dataset.fb='1';
+    img.src='https://raw.githubusercontent.com/'+m[1]+'/'+m[2]+'/main/'+m[3];
+  }, true);
 
   // 빌드 스탬프. build2.js가 1791897556759를 매 빌드마다 교체한다.
   // ⚠️ 이게 없으면 브라우저가 data/t/<작품>.json을 캐시해 **번역이 갱신돼도 옛 일본어판을 계속 보여준다**.
@@ -512,7 +522,8 @@
   function openLB(g,i){ lbG=g; lbI=i; showLB(); lb.classList.add('on'); }
   function showLB(){
     const v=lbG.v[lbI];
-    $('#lbImg').src=imgUrl(v.i,'f');
+    const li=$('#lbImg'); delete li.dataset.fb;   // 같은 img 재사용 → 카드마다 대체 경로 1회 허용
+    li.src=imgUrl(v.i,'f');
     $('#lbCap').innerHTML='<span class="r">'+esc(v.r)+'</span> '+esc(v.rk)+' · '+esc(v.n)+' · '+esc(lbG.nk||lbG.nj)+
       ' <span style="opacity:.6">('+(lbI+1)+'/'+lbG.v.length+')</span>';
   }
