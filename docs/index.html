@@ -243,11 +243,11 @@
     img.src='https://raw.githubusercontent.com/'+m[1]+'/'+m[2]+'/main/'+m[3];
   }, true);
 
-  // 빌드 스탬프. build2.js가 1791897556759를 매 빌드마다 교체한다.
+  // 빌드 스탬프. build2.js가 1791904586750를 매 빌드마다 교체한다.
   // ⚠️ 이게 없으면 브라우저가 data/t/<작품>.json을 캐시해 **번역이 갱신돼도 옛 일본어판을 계속 보여준다**.
   //    build2는 미번역 작품도 t/<key>.json을 만들므로, 번역 전에 한 번이라도 열어본 작품은
   //    캐시에 "한국어 없는 판"이 남는다. 걸프렌드(24)가 실제로 그랬다.
-  let BUILD='1791897556759';
+  let BUILD='1791904586750';
   let M=null, G=null, TITLE=null, lang=localStorage.getItem('ws_lang')||'ko';
   let filtered=[], drawn=0;
   const CHUNK=40;
